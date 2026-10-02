@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberHack Arena - Online & Local Multiplayer IT Game</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- PeerJS for WebRTC Online Multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- FontAwesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Orbitron:wght@600;800;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"Fira Code"', 'monospace'],
+                        display: ['Orbitron', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif']
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#080c14',
+                            card: '#0f172a',
+                            border: '#1e293b',
+                            cyan: '#00f0ff',
+                            magenta: '#ff007f',
+                            lime: '#39ff14',
+                            yellow: '#ffd700',
+                            purple: '#a855f7'
+                        }
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 20px rgba(0, 240, 255, 0.4)',
+                        'neon-magenta': '0 0 20px rgba(255, 0, 127, 0.4)',
+                        'neon-lime': '0 0 20px rgba(57, 255, 20, 0.4)',
+                        'neon-purple': '0 0 20px rgba(168, 85, 247, 0.4)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #080c14;
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(0, 240, 255, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(255, 0, 127, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(57, 255, 20, 0.03) 0%, transparent 60%);
+            background-attachment: fixed;
+        }
+
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.35) 50%,
+                rgba(0, 0, 0, 0.35)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .terminal-code {
+            font-family: 'Fira Code', monospace;
+            background-color: #030712;
+            color: #39ff14;
+            border-left: 3px solid #39ff14;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 10px rgba(0,240,255,0.6)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 20px rgba(0,240,255,0.9)); }
+        }
+
+        .animate-glow {
+            animation: pulseGlow 2.5s infinite;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080c14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f0ff;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative overflow-x-hidden select-none">
+
+    <!-- Scanline effect overlay -->
+    <div class="fixed inset-0 scanline z-50 pointer-events-none opacity-30"></div>
+
+    <header class="w-full glass-panel border-b border-gray-800 p-4 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="showScreen('screenHome')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyber-cyan to-cyber-magenta flex items-center justify-center text-black font-display font-bold text-xl shadow-neon-cyan">
+                    <i class="fa-solid fa-terminal"></i>
+                </div>
+                <div>
+                    <h1 class="font-display font-black text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyber-cyan via-white to-cyber-magenta">
+                        CYBER<span class="text-cyber-lime">HACK</span>
+                    </h1>
+                    <p class="text-[10px] font-mono text-gray-400 tracking-widest uppercase">P2P Online & Local Mabar Arena</p>
+                </div>
+            </div>
+
+            <!-- Profile & Audio Actions -->
+            <div class="flex items-center gap-3">
+                <!-- User Profile Chip -->
+                <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs font-mono">
+                    <span id="playerAvatarDisplay" class="text-base">🤖</span>
+                    <span id="playerNameDisplay" class="text-gray-200 font-bold">CyberUser</span>
+                    <button onclick="openProfileModal()" class="ml-1 text-cyber-cyan hover:underline text-[10px]"><i class="fa-solid fa-pen-to-square"></i></button>
+                </div>
+
+                <!-- SFX Mute Toggle Button -->
+                <button id="sfxToggleBtn" onclick="toggleSFX()" class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs font-mono text-gray-300 transition flex items-center gap-2">
+                    <i id="sfxIcon" class="fa-solid fa-volume-high text-cyber-lime"></i>
+                    <span id="sfxLabel" class="hidden md:inline">SFX ON</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto w-full p-4 md:p-6 flex-1 flex flex-col justify-center relative">
+
+        <!-- ================= SCREEN 1: MAIN MENU / HOME ================= -->
+        <section id="screenHome" class="space-y-8 py-6">
+            <div class="text-center max-w-2xl mx-auto space-y-3">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyber-cyan/40 text-cyber-cyan text-xs font-mono">
+                    <span class="w-2 h-2 rounded-full bg-cyber-lime animate-ping"></span> Real-Time WebRTC P2P Enabled
+                </div>
+                <h2 class="font-display font-black text-3xl md:text-5xl tracking-wide leading-tight">
+                    MULTIPLAYER <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyber-cyan via-cyber-lime to-cyber-magenta">IT ARENA</span>
+                </h2>
+                <p class="text-gray-400 text-sm md:text-base">
+                    Main bareng temen lewat <b class="text-cyber-cyan">Room Code P2P (HP/PC beda lokasi)</b> atau <b class="text-cyber-lime">Local Mabar 1 Layar</b>. Uji skill Networking, Web Dev, DevOps, & Cybersecurity!
+                </p>
+            </div>
+
+            <!-- Mode Selector Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                <!-- ONLINE MULTIPLAYER (P2P WEBRTC) -->
+                <div class="glass-panel p-6 rounded-2xl border border-cyber-cyan/30 hover:border-cyber-cyan transition duration-300 flex flex-col justify-between space-y-6 shadow-neon-cyan/20">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-cyan-950 border border-cyber-cyan flex items-center justify-center text-cyber-cyan text-2xl mb-4">
+                            <i class="fa-solid fa-network-wired"></i>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="font-display font-bold text-lg text-white">ONLINE ROOM (P2P)</h3>
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyber-cyan border border-cyber-cyan/30 text-[10px] font-mono">Mabar Beda HP / PC</span>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">
+                            Buat Room Code & kirim kode ke temenmu! Kamu & temenmu langsung terkoneksi secara Peer-to-Peer tanpa perlu server database tambahan.
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button onclick="initHostOnlineRoom()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 font-display font-bold text-sm text-black hover:opacity-90 transition shadow-neon-cyan flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> CREATE ONLINE ROOM
+                        </button>
+
+                        <div class="flex gap-2">
+                            <input type="text" id="joinRoomCodeInput" placeholder="Masukkan Room Code (misal: CYBER-802)" class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2.5 text-xs text-white uppercase font-mono focus:outline-none focus:border-cyber-cyan">
+                            <button onclick="initJoinOnlineRoom()" class="px-4 py-2.5 rounded-xl bg-gray-800 border border-gray-700 font-display font-bold text-xs text-cyber-cyan hover:bg-gray-700 transition">
+                                JOIN <i class="fa-solid fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOCAL MABAR (1 DEVICE / PASS & PLAY) -->
+                <div class="glass-panel p-6 rounded-2xl border border-cyber-magenta/30 hover:border-cyber-magenta transition duration-300 flex flex-col justify-between space-y-6 shadow-neon-magenta/20">
+                    <div>
+                        <div class="w-12 h-12 rounded-xl bg-pink-950 border border-cyber-magenta flex items-center justify-center text-cyber-magenta text-2xl mb-4">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="font-display font-bold text-lg text-white">LOCAL MABAR</h3>
+                            <span class="px-2 py-0.5 rounded bg-pink-500/20 text-cyber-magenta border border-cyber-magenta/30 text-[10px] font-mono">1 Layar / Pass & Play</span>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">
+                            Nongkrong bareng di 1 HP atau 1 Laptop. Main gantian per turn atau adu pencet tombol buzzer di keyboard (Tombol A, L, V, P).
+                        </p>
+                    </div>
+
+                    <button onclick="setupLocalGame()" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyber-magenta to-purple-600 font-display font-bold text-sm text-white hover:opacity-90 transition shadow-neon-magenta flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-gamepad"></i> START LOCAL MATCH
+                    </button>
+                </div>
+            </div>
+
+            <!-- Single Player / Practice High Scores -->
+            <div class="max-w-4xl mx-auto glass-panel p-4 rounded-xl border border-gray-800 flex items-center justify-between text-xs font-mono">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-trophy text-cyber-yellow text-lg"></i>
+                    <div>
+                        <span class="text-gray-400">Your Lifetime High Score:</span>
+                        <span id="statHighScore" class="text-white font-bold ml-2">0 pts</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-gray-400">Matches Played:</span>
+                    <span id="statMatches" class="text-cyber-cyan font-bold">0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SCREEN 2: ROOM LOBBY ================= -->
+        <section id="screenLobby" class="hidden glass-panel p-6 md:p-8 rounded-2xl max-w-2xl mx-auto w-full border border-cyber-cyan/40 shadow-2xl space-y-6">
+            <!-- Header Banner -->
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                <div>
+                    <div class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Match Lobby</div>
+                    <h3 id="lobbyTitleText" class="font-display font-bold text-2xl text-white">ROOM LOBBY</h3>
+                </div>
+
+                <!-- Room Code Display Tag -->
+                <div id="roomCodeBox" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 border border-cyber-cyan text-cyber-cyan font-mono text-sm font-bold">
+                    <span>CODE: <span id="displayRoomCode" class="text-white">CYBER-88</span></span>
+                    <button onclick="copyRoomCode()" title="Copy Code" class="hover:text-white transition ml-1"><i class="fa-solid fa-copy"></i></button>
+                </div>
+            </div>
+
+            <!-- Game Mode Selection (Host Only) -->
+            <div class="space-y-3">
+                <label class="block font-mono text-xs text-cyber-cyan uppercase tracking-wider">Select Game Mode</label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button type="button" onclick="selectGameMode('trivia')" id="modeBtnTrivia" class="p-3 rounded-xl border border-cyber-cyan bg-cyan-950/40 text-left transition">
+                        <div class="font-display font-bold text-xs text-cyber-cyan mb-1"><i class="fa-solid fa-bolt mr-1"></i> Rapid Trivia</div>
+                        <p class="text-[10px] text-gray-400 leading-snug">Speed + accuracy trivia covering full IT stack.</p>
+                    </button>
+
+                    <button type="button" onclick="selectGameMode('terminal')" id="modeBtnTerminal" class="p-3 rounded-xl border border-gray-800 bg-gray-900 text-left transition">
+                        <div class="font-display font-bold text-xs text-gray-300 mb-1"><i class="fa-solid fa-code mr-1"></i> Terminal Bug Hunt</div>
+                        <p class="text-[10px] text-gray-400 leading-snug">Predict code outputs & locate critical bugs.</p>
+                    </button>
+
+                    <button type="button" onclick="selectGameMode('boss')" id="modeBtnBoss" class="p-3 rounded-xl border border-gray-800 bg-gray-900 text-left transition">
+                        <div class="font-display font-bold text-xs text-gray-300 mb-1"><i class="fa-solid fa-skull mr-1"></i> Firewall Boss Raid</div>
+                        <p class="text-[10px] text-gray-400 leading-snug">Co-op mode: Team up to hack AI Firewall Boss!</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Connected Players Roster -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <label class="font-mono text-xs text-cyber-cyan uppercase tracking-wider">Connected Squad (<span id="playerCountCount">1</span>/4)</label>
+                    <span id="connectionStatusIndicator" class="text-[10px] font-mono text-cyber-lime flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-cyber-lime animate-pulse"></span> P2P Ready
+                    </span>
+                </div>
+
+                <div id="lobbyPlayerList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Dynamic player slots will be injected here -->
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex gap-3 pt-2">
+                <button onclick="leaveLobby()" class="py-3 px-5 rounded-xl bg-gray-800 border border-gray-700 text-gray-300 font-display font-bold text-xs hover:bg-gray-700 transition">
+                    LEAVE
+                </button>
+                <button id="startMatchBtn" onclick="triggerStartGame()" class="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-cyber-lime text-black font-display font-black text-sm hover:opacity-90 transition shadow-neon-cyan">
+                    START MATCH ⚡
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= SCREEN 3: GAMEPLAY ARENA ================= -->
+        <section id="screenGameplay" class="hidden flex-col space-y-6">
+            <!-- Top HUD Bar -->
+            <div class="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-cyber-cyan">
+                <div class="flex items-center gap-3">
+                    <span id="gameModeBadge" class="px-2.5 py-1 rounded bg-cyber-cyan/10 border border-cyber-cyan text-cyber-cyan font-mono text-xs font-bold uppercase">Rapid Trivia</span>
+                    <span id="questionProgressText" class="font-mono text-xs text-gray-300">Q 1/10</span>
+                </div>
+
+                <!-- Timer Indicator -->
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <div class="text-[10px] font-mono text-gray-400 uppercase">Clock</div>
+                        <div id="hudTimerText" class="font-mono font-bold text-lg text-cyber-cyan">15s</div>
+                    </div>
+                    <div class="w-10 h-10 rounded-full border-2 border-gray-800 flex items-center justify-center relative">
+                        <svg class="w-10 h-10 transform -rotate-90">
+                            <circle id="hudTimerCircle" cx="20" cy="20" r="16" stroke="currentColor" stroke-width="3" fill="transparent" class="text-cyber-cyan transition-all duration-1000" stroke-dasharray="100.5" stroke-dashoffset="0"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boss Raid Health Bar (Hidden unless mode === 'boss') -->
+            <div id="bossHpSection" class="hidden glass-panel p-4 rounded-xl border border-cyber-magenta/50 space-y-2">
+                <div class="flex justify-between items-center text-xs font-mono">
+                    <span class="text-cyber-magenta font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved animate-bounce"></i> AI FIREWALL MAINFRAME
+                    </span>
+                    <span id="bossHpText" class="text-gray-300">1000 / 1000 HP</span>
+                </div>
+                <div class="w-full h-4 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
+                    <div id="bossHpBar" class="h-full bg-gradient-to-r from-red-600 via-pink-500 to-cyber-magenta transition-all duration-500" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- Realtime Scoreboard Chips -->
+            <div id="gameplayScoreboard" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <!-- Dynamic Player Score Cards -->
+            </div>
+
+            <!-- Main Question & Interaction Card -->
+            <div class="glass-panel p-6 md:p-8 rounded-2xl border border-gray-800 shadow-2xl relative">
+                <!-- Turn / Event Banner -->
+                <div id="gameplayBanner" class="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold border border-gray-700 bg-gray-900 text-gray-300">
+                    <!-- Dynamic banner status -->
+                </div>
+
+                <!-- Category & Difficulty Tag -->
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <span id="questionCategoryTag" class="text-xs font-mono font-bold uppercase tracking-wider text-cyber-cyan">CYBERSECURITY</span>
+                    <span id="questionDifficultyTag" class="text-xs font-mono px-2 py-0.5 rounded bg-gray-800 border border-gray-700 text-cyber-yellow">Medium</span>
+                </div>
+
+                <!-- Code Terminal Snippet Block (If Code Bug Mode) -->
+                <div id="terminalCodeBox" class="hidden my-4 p-4 rounded-xl terminal-code text-xs sm:text-sm overflow-x-auto whitespace-pre">
+                    <!-- Dynamic Code Snippet -->
+                </div>
+
+                <!-- Main Question Text -->
+                <h3 id="questionTitleText" class="font-display text-base md:text-xl font-semibold text-white mb-6 leading-relaxed">
+                    Question text loading...
+                </h3>
+
+                <!-- Options Grid -->
+                <div id="optionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- Dynamic Option Buttons -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SCREEN 4: VICTORY & LEADERBOARD ================= -->
+        <section id="screenVictory" class="hidden glass-panel p-6 md:p-10 rounded-2xl text-center max-w-2xl mx-auto w-full border border-cyber-magenta/50 shadow-neon-magenta space-y-6">
+            <div class="inline-block p-4 rounded-full bg-pink-950/50 border border-cyber-magenta animate-glow">
+                <span class="text-4xl">👑</span>
+            </div>
+
+            <div>
+                <h2 class="font-display font-black text-3xl md:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-cyber-cyan via-white to-cyber-magenta">
+                    MATCH CONCLUDED
+                </h2>
+                <p id="victorySubtitle" class="text-sm font-mono text-cyber-cyan mt-1">Player 1 Dominates the Cyber Arena!</p>
+            </div>
+
+            <!-- Final Leaderboard Box -->
+            <div class="glass-panel rounded-xl p-4 border border-gray-800 space-y-3">
+                <div class="text-xs font-mono uppercase text-gray-400 text-left">Final Standings</div>
+                <div id="finalLeaderboardList" class="space-y-2">
+                    <!-- Dynamic Final Scores -->
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button onclick="showScreen('screenLobby')" class="flex-1 py-3.5 rounded-xl bg-cyber-cyan text-black font-display font-bold hover:bg-cyan-400 transition shadow-neon-cyan">
+                    REMATCH IN LOBBY 🔄
+                </button>
+                <button onclick="showScreen('screenHome')" class="flex-1 py-3.5 rounded-xl bg-gray-800 border border-gray-700 text-white font-display font-bold hover:bg-gray-700 transition">
+                    MAIN MENU 🏠
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Profile Setup -->
+    <div id="profileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-2xl border border-cyber-cyan max-w-md w-full space-y-4">
+            <h3 class="font-display font-bold text-lg text-white">CUSTOMIZE PROFILE</h3>
+            
+            <div class="space-y-2">
+                <label class="text-xs font-mono text-gray-400">Player Name</label>
+                <input type="text" id="modalNameInput" maxlength="12" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-cyber-cyan">
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-mono text-gray-400">Choose Avatar</label>
+                <div class="grid grid-cols-5 gap-2 text-2xl">
+                    <button onclick="selectAvatar('🤖')" class="p-2 rounded bg-gray-900 border hover:border-cyber-cyan">🤖</button>
+                    <button onclick="selectAvatar('👾')" class="p-2 rounded bg-gray-900 border hover:border-cyber-cyan">👾</button>
+                    <button onclick="selectAvatar('⚡')" class="p-2 rounded bg-gray-900 border hover:border-cyber-cyan">⚡</button>
+                    <button onclick="selectAvatar('💻')" class="p-2 rounded bg-gray-900 border hover:border-cyber-cyan">💻</button>
+                    <button onclick="selectAvatar('🕵️')" class="p-2 rounded bg-gray-900 border hover:border-cyber-cyan">🕵️</button>
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button onclick="saveProfileModal()" class="w-full py-2.5 rounded-xl bg-cyber-cyan text-black font-display font-bold text-xs">
+                    SAVE PROFILE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="w-full text-center py-4 font-mono text-xs text-gray-500 border-t border-gray-800/60 mt-auto">
+        CyberHack Arena • WebRTC Peer-To-Peer Online & Local Mabar
+    </footer>
+
+    <script>
+        /* ================= 1. WEB AUDIO SYNTHESIZER ================= */
+        class CyberAudio {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+            }
+
+            playCorrect() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.18); // A5
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            }
+
+            playWrong() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.25);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playTick() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1200, now);
+                gain.gain.setValueAtTime(0.03, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.04);
+            }
+
+            playBuzzer() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(880, now + 0.08);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.18);
+            }
+
+            playVictory() {
+                if (this.muted) return;
+                this.init();
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const now = this.ctx.currentTime + (idx * 0.1);
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                });
+            }
+        }
+
+        const audio = new CyberAudio();
+
+        /* ================= 2. IT QUESTION BANK ================= */
+        const QUESTION_DATABASE = {
+            trivia: [
+                {
+                    category: "CYBERSECURITY",
+                    question: "Prinsip dasar 'CIA Triad' dalam keamanan informasi merupakan singkatan dari apa?",
+                    options: ["Confidentiality, Integrity, Availability", "Control, Inspection, Authentication", "Cipher, Identity, Access", "Cyber, Intelligence, Authorization"],
+                    answer: 0,
+                    difficulty: "Easy"
+                },
+                {
+                    category: "NETWORKING",
+                    question: "Port standar yang digunakan oleh protokol SSH untuk remote server adalah?",
+                    options: ["Port 80", "Port 21", "Port 22", "Port 443"],
+                    answer: 2,
+                    difficulty: "Easy"
+                },
+                {
+                    category: "WEB DEVELOPMENT",
+                    question: "Manakah HTTP Status Code yang menandakan bahwa request berhasil diproses (OK)?",
+                    options: ["404", "500", "301", "200"],
+                    answer: 3,
+                    difficulty: "Easy"
+                },
+                {
+                    category: "DEVOPS & CLOUD",
+                    question: "Perintah Docker untuk melihat daftar kontainer yang sedang berjalan adalah?",
+                    options: ["docker run", "docker ps", "docker images", "docker exec"],
+                    answer: 1,
+                    difficulty: "Medium"
+                },
+                {
+                    category: "HARDWARE & IOT",
+                    question: "Protokol komunikasi IoT hemat daya yang berbasis sistem Publish/Subscribe adalah?",
+                    options: ["HTTP", "MQTT", "FTP", "WebSocket"],
+                    answer: 1,
+                    difficulty: "Medium"
+                }
+            ],
+            terminal: [
+                {
+                    category: "JAVASCRIPT BUG",
+                    question: "Apa hasil output dari kode JavaScript di samping?",
+                    code: "console.log(typeof ([] + {}));",
+                    options: ["'object'", "'string'", "'array'", "'undefined'"],
+                    answer: 1,
+                    difficulty: "Hard"
+                },
+                {
+                    category: "PYTHON BUG",
+                    question: "Temukan hasil return dari fungsi Python berikut:",
+                    code: "def check(x=[]):\n  x.append(1)\n  return len(x)\nprint(check(), check())",
+                    options: ["1 1", "1 2", "2 2", "Error"],
+                    answer: 1,
+                    difficulty: "Hard"
+                },
+                {
+                    category: "BASH COMMAND",
+                    question: "Apa kegunaan perintah linux berikut: 'chmod 755 script.sh'?",
+                    options: ["Menghapus file", "Memberi akses Read/Write/Exec ke Owner & Read/Exec ke User lain", "Mengubah nama file", "Membuat shortcut file"],
+                    answer: 1,
+                    difficulty: "Medium"
+                }
+            ],
+            boss: [
+                {
+                    category: "BOSS RAID: SQL INJECTION",
+                    question: "Pilih query payload yang efektif membypass otentikasi login rentan!",
+                    options: ["' OR '1'='1", "SELECT * FROM users", "<script>alert(1)</script>", "admin; DROP TABLE;"],
+                    answer: 0,
+                    difficulty: "Medium"
+                },
+                {
+                    category: "BOSS RAID: NETWORKING",
+                    question: "Subnet mask /24 memiliki total berapa IP Address yang bisa dialokasikan?",
+                    options: ["128", "256", "512", "1024"],
+                    answer: 1,
+                    difficulty: "Easy"
+                },
+                {
+                    category: "BOSS RAID: CRYPTOGRAPHY",
+                    question: "Algoritma enkripsi asimetris yang mengandalkan kunci Publik dan Private adalah?",
+                    options: ["AES-256", "DES", "RSA", "MD5"],
+                    answer: 2,
+                    difficulty: "Medium"
+                }
+            ]
+        };
+
+        /* ================= 3. APP STATE & LOCAL STORAGE ================= */
+        let localPlayer = {
+            id: 'p_' + Math.random().toString(36).substring(2, 7),
+            name: 'CyberUser',
+            avatar: '🤖',
+            score: 0,
+            streak: 0,
+            color: '#00f0ff'
+        };
+
+        let appState = {
+            screen: 'screenHome',
+            isHost: false,
+            onlineMode: false, // true = P2P online, false = Local Mabar
+            roomCode: '',
+            gameMode: 'trivia', // 'trivia', 'terminal', 'boss'
+            players: [],
+            peer: null,
+            connections: [], // Host stores connections to peers
+            hostConn: null,  // Peer stores connection to host
+            questions: [],
+            currentQIndex: 0,
+            timer: 15,
+            timerInterval: null,
+            bossHp: 1000,
+            acceptingAnswers: false
+        };
+
+        // Initialize local profile
+        function initProfile() {
+            const savedName = localStorage.getItem('cyber_name');
+            const savedAvatar = localStorage.getItem('cyber_avatar');
+            const savedScore = localStorage.getItem('cyber_highscore') || 0;
+            const savedMatches = localStorage.getItem('cyber_matches') || 0;
+
+            if (savedName) localPlayer.name = savedName;
+            if (savedAvatar) localPlayer.avatar = savedAvatar;
+
+            document.getElementById('playerNameDisplay').textContent = localPlayer.name;
+            document.getElementById('playerAvatarDisplay').textContent = localPlayer.avatar;
+            document.getElementById('statHighScore').textContent = savedScore + ' pts';
+            document.getElementById('statMatches').textContent = savedMatches;
+        }
+
+        /* ================= 4. SCREEN NAVIGATION ================= */
+        function showScreen(screenId) {
+            appState.screen = screenId;
+            ['screenHome', 'screenLobby', 'screenGameplay', 'screenVictory'].forEach(id => {
+                const el = document.getElementById(id);
+                if (id === screenId) {
+                    el.classList.remove('hidden');
+                    if (id === 'screenGameplay') el.classList.add('flex');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+        }
+
+        /* ================= 5. ONLINE P2P (PEERJS) ENGINE ================= */
+        function initHostOnlineRoom() {
+            appState.onlineMode = true;
+            appState.isHost = true;
+            appState.players = [localPlayer];
+
+            const roomCode = 'CYBER-' + Math.floor(100 + Math.random() * 900);
+            appState.roomCode = roomCode;
+
+            document.getElementById('displayRoomCode').textContent = roomCode;
+            document.getElementById('lobbyTitleText').textContent = "HOST ROOM (ONLINE P2P)";
+            document.getElementById('startMatchBtn').classList.remove('hidden');
+
+            renderLobbyPlayers();
+            showScreen('screenLobby');
+
+            // Initialize PeerJS Host
+            if (appState.peer) appState.peer.destroy();
+            appState.peer = new Peer(roomCode);
+
+            appState.peer.on('open', (id) => {
+                console.log('Host Peer initialized with ID:', id);
+            });
+
+            appState.peer.on('connection', (conn) => {
+                appState.connections.push(conn);
+
+                conn.on('data', (data) => {
+                    handleHostReceivedData(conn, data);
+                });
+
+                conn.on('close', () => {
+                    appState.connections = appState.connections.filter(c => c !== conn);
+                    appState.players = appState.players.filter(p => p.peerId !== conn.peer);
+                    broadcastToPeers({ type: 'LOBBY_UPDATE', players: appState.players, mode: appState.gameMode });
+                    renderLobbyPlayers();
+                });
+            });
+        }
+
+        function initJoinOnlineRoom() {
+            const inputCode = document.getElementById('joinRoomCodeInput').value.trim().toUpperCase();
+            if (!inputCode) {
+                alert('Masukkan Room Code terlebih dahulu!');
+                return;
+            }
+
+            appState.onlineMode = true;
+            appState.isHost = false;
+            appState.roomCode = inputCode;
+
+            document.getElementById('displayRoomCode').textContent = inputCode;
+            document.getElementById('lobbyTitleText').textContent = "JOINED ROOM (P2P)";
+            document.getElementById('startMatchBtn').classList.add('hidden');
+
+            showScreen('screenLobby');
+
+            if (appState.peer) appState.peer.destroy();
+            appState.peer = new Peer();
+
+            appState.peer.on('open', () => {
+                const conn = appState.peer.connect(inputCode);
+                appState.hostConn = conn;
+
+                conn.on('open', () => {
+                    // Send Join Info
+                    conn.send({ type: 'JOIN_REQUEST', player: localPlayer });
+                });
+
+                conn.on('data', (data) => {
+                    handleClientReceivedData(data);
+                });
+            });
+        }
+
+        function handleHostReceivedData(conn, data) {
+            if (data.type === 'JOIN_REQUEST') {
+                const newPlayer = { ...data.player, peerId: conn.peer };
+                appState.players.push(newPlayer);
+
+                // Broadcast updated player list to everyone
+                broadcastToPeers({ type: 'LOBBY_UPDATE', players: appState.players, mode: appState.gameMode });
+                renderLobbyPlayers();
+            } else if (data.type === 'SUBMIT_ANSWER') {
+                processAnswerSubmission(data.playerId, data.optionIndex);
+            }
+        }
+
+        function handleClientReceivedData(data) {
+            if (data.type === 'LOBBY_UPDATE') {
+                appState.players = data.players;
+                appState.gameMode = data.mode;
+                renderLobbyPlayers();
+            } else if (data.type === 'START_GAME') {
+                appState.questions = data.questions;
+                appState.currentQIndex = 0;
+                appState.bossHp = 1000;
+                showScreen('screenGameplay');
+                renderGameplayScreen();
+            } else if (data.type === 'STATE_UPDATE') {
+                appState.players = data.players;
+                appState.bossHp = data.bossHp;
+                renderGameplayHeader();
+            } else if (data.type === 'NEXT_QUESTION') {
+                appState.currentQIndex = data.qIndex;
+                renderGameplayScreen();
+            } else if (data.type === 'GAME_OVER') {
+                endGame(data.sortedPlayers);
+            }
+        }
+
+        function broadcastToPeers(payload) {
+            if (appState.connections) {
+                appState.connections.forEach(conn => {
+                    if (conn.open) conn.send(payload);
+                });
+            }
+        }
+
+        /* ================= 6. LOCAL MABAR (1 SCREEN SETUP) ================= */
+        function setupLocalGame() {
+            appState.onlineMode = false;
+            appState.isHost = true;
+            appState.players = [
+                { id: 'p1', name: 'Player 1', avatar: '🤖', score: 0, streak: 0, color: '#00f0ff' },
+                { id: 'p2', name: 'Player 2', avatar: '👾', score: 0, streak: 0, color: '#ff007f' }
+            ];
+
+            document.getElementById('displayRoomCode').textContent = "LOCAL MABAR";
+            document.getElementById('lobbyTitleText').textContent = "LOCAL MATCH SETUP";
+            document.getElementById('startMatchBtn').classList.remove('hidden');
+
+            renderLobbyPlayers();
+            showScreen('screenLobby');
+        }
+
+        function renderLobbyPlayers() {
+            const list = document.getElementById('lobbyPlayerList');
+            document.getElementById('playerCountCount').textContent = appState.players.length;
+            list.innerHTML = '';
+
+            appState.players.forEach((p, idx) => {
+                const card = document.createElement('div');
+                card.className = "p-3 rounded-xl bg-gray-900 border border-gray-800 flex items-center justify-between";
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${p.avatar}</span>
+                        <div>
+                            <div class="text-xs font-bold font-mono text-white">${p.name}</div>
+                            <div class="text-[10px] font-mono text-cyber-cyan">${idx === 0 ? '👑 Room Host' : 'Player ' + (idx + 1)}</div>
+                        </div>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-cyber-lime"></span>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function selectGameMode(mode) {
+            appState.gameMode = mode;
+            ['trivia', 'terminal', 'boss'].forEach(m => {
+                const btn = document.getElementById('modeBtn' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (m === mode) {
+                    btn.className = "p-3 rounded-xl border border-cyber-cyan bg-cyan-950/40 text-left transition";
+                } else {
+                    btn.className = "p-3 rounded-xl border border-gray-800 bg-gray-900 text-left transition";
+                }
+            });
+
+            if (appState.onlineMode && appState.isHost) {
+                broadcastToPeers({ type: 'LOBBY_UPDATE', players: appState.players, mode: appState.gameMode });
+            }
+        }
+
+        /* ================= 7. GAMEPLAY ENGINE ================= */
+        function triggerStartGame() {
+            audio.init();
+            
+            // Pick questions
+            const pool = QUESTION_DATABASE[appState.gameMode] || QUESTION_DATABASE.trivia;
+            appState.questions = [...pool].sort(() => 0.5 - Math.random());
+            appState.currentQIndex = 0;
+            appState.bossHp = 1000;
+
+            if (appState.onlineMode && appState.isHost) {
+                broadcastToPeers({
+                    type: 'START_GAME',
+                    questions: appState.questions,
+                    mode: appState.gameMode
+                });
+            }
+
+            showScreen('screenGameplay');
+            renderGameplayScreen();
+        }
+
+        function renderGameplayScreen() {
+            if (appState.currentQIndex >= appState.questions.length) {
+                if (appState.isHost) {
+                    const sorted = [...appState.players].sort((a, b) => b.score - a.score);
+                    if (appState.onlineMode) broadcastToPeers({ type: 'GAME_OVER', sortedPlayers: sorted });
+                    endGame(sorted);
+                }
+                return;
+            }
+
+            const q = appState.questions[appState.currentQIndex];
+            appState.acceptingAnswers = true;
+
+            // HUD Tags
+            document.getElementById('gameModeBadge').textContent = appState.gameMode.toUpperCase();
+            document.getElementById('questionProgressText').textContent = `Q ${appState.currentQIndex + 1}/${appState.questions.length}`;
+            document.getElementById('questionCategoryTag').textContent = q.category;
+            document.getElementById('questionDifficultyTag').textContent = q.difficulty;
+            document.getElementById('questionTitleText').textContent = q.question;
+
+            // Terminal Code snippet view
+            const codeBox = document.getElementById('terminalCodeBox');
+            if (q.code) {
+                codeBox.classList.remove('hidden');
+                codeBox.textContent = q.code;
+            } else {
+                codeBox.classList.add('hidden');
+            }
+
+            // Boss Hp Bar visibility
+            const bossSec = document.getElementById('bossHpSection');
+            if (appState.gameMode === 'boss') {
+                bossSec.classList.remove('hidden');
+                document.getElementById('bossHpText').textContent = `${appState.bossHp} / 1000 HP`;
+                document.getElementById('bossHpBar').style.width = `${(appState.bossHp / 1000) * 100}%`;
+            } else {
+                bossSec.classList.add('hidden');
+            }
+
+            // Render Options
+            const optionsGrid = document.getElementById('optionsGrid');
+            optionsGrid.innerHTML = '';
+
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => handleAnswerClick(idx);
+                btn.className = "p-4 rounded-xl border border-gray-800 bg-gray-900 hover:border-cyber-cyan text-left font-mono text-xs sm:text-sm text-gray-200 transition group flex items-center justify-between";
+                btn.innerHTML = `
+                    <span><b class="text-cyber-cyan mr-2">${String.fromCharCode(65 + idx)}.</b> ${opt}</span>
+                    <i class="fa-solid fa-chevron-right opacity-0 group-hover:opacity-100 text-cyber-cyan transition"></i>
+                `;
+                optionsGrid.appendChild(btn);
+            });
+
+            renderGameplayHeader();
+            startTimer(15);
+        }
+
+        function renderGameplayHeader() {
+            const scoreboard = document.getElementById('gameplayScoreboard');
+            scoreboard.innerHTML = '';
+
+            appState.players.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "glass-panel p-3 rounded-xl border border-gray-800 flex items-center justify-between";
+                card.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${p.avatar}</span>
+                        <div>
+                            <div class="text-xs font-bold text-white font-mono">${p.name}</div>
+                            <div class="text-[10px] text-gray-400 font-mono">${p.streak > 1 ? '🔥 x' + p.streak : 'Streak 0'}</div>
+                        </div>
+                    </div>
+                    <div class="text-sm font-mono font-bold text-cyber-cyan">${p.score}</div>
+                `;
+                scoreboard.appendChild(card);
+            });
+        }
+
+        function startTimer(seconds) {
+            clearInterval(appState.timerInterval);
+            appState.timer = seconds;
+            updateTimerUI();
+
+            appState.timerInterval = setInterval(() => {
+                appState.timer--;
+                audio.playTick();
+                updateTimerUI();
+
+                if (appState.timer <= 0) {
+                    clearInterval(appState.timerInterval);
+                    if (appState.isHost) processAnswerSubmission(null, -1);
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            const txt = document.getElementById('hudTimerText');
+            const circle = document.getElementById('hudTimerCircle');
+            txt.textContent = appState.timer + 's';
+
+            const maxDash = 100.5;
+            const offset = maxDash - (appState.timer / 15) * maxDash;
+            circle.style.strokeDashoffset = offset;
+        }
+
+        function handleAnswerClick(optionIndex) {
+            if (!appState.acceptingAnswers) return;
+
+            if (appState.onlineMode && !appState.isHost) {
+                // Send answer to host
+                appState.hostConn.send({ type: 'SUBMIT_ANSWER', playerId: localPlayer.id, optionIndex: optionIndex });
+                appState.acceptingAnswers = false;
+            } else {
+                // Host processes locally
+                processAnswerSubmission(localPlayer.id, optionIndex);
+            }
+        }
+
+        function processAnswerSubmission(playerId, optionIndex) {
+            if (!appState.acceptingAnswers && appState.onlineMode) return;
+            appState.acceptingAnswers = false;
+            clearInterval(appState.timerInterval);
+
+            const q = appState.questions[appState.currentQIndex];
+            const isCorrect = optionIndex === q.answer;
+
+            // Find player or default host
+            const player = appState.players.find(p => p.id === playerId) || appState.players[0];
+
+            if (isCorrect) {
+                audio.playCorrect();
+                player.streak++;
+                player.score += 100 * player.streak + appState.timer * 5;
+
+                if (appState.gameMode === 'boss') {
+                    appState.bossHp = Math.max(0, appState.bossHp - 250);
+                }
+            } else {
+                audio.playWrong();
+                player.streak = 0;
+            }
+
+            if (appState.onlineMode && appState.isHost) {
+                broadcastToPeers({
+                    type: 'STATE_UPDATE',
+                    players: appState.players,
+                    bossHp: appState.bossHp
+                });
+            }
+
+            renderGameplayHeader();
+
+            setTimeout(() => {
+                appState.currentQIndex++;
+                if (appState.onlineMode && appState.isHost) {
+                    broadcastToPeers({ type: 'NEXT_QUESTION', qIndex: appState.currentQIndex });
+                }
+                renderGameplayScreen();
+            }, 1500);
+        }
+
+        /* ================= 8. GAME OVER & PROFILE ================= */
+        function endGame(sortedPlayers) {
+            audio.playVictory();
+            showScreen('screenVictory');
+
+            const winner = sortedPlayers[0];
+            document.getElementById('victorySubtitle').textContent = `🏆 ${winner.name} Wins the Match!`;
+
+            const list = document.getElementById('finalLeaderboardList');
+            list.innerHTML = '';
+
+            sortedPlayers.forEach((p, idx) => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between p-3 rounded-lg bg-gray-900 border border-gray-800 font-mono text-xs";
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold ${idx === 0 ? 'text-cyber-yellow' : 'text-gray-500'}">#${idx + 1}</span>
+                        <span class="text-base">${p.avatar}</span>
+                        <span class="text-white font-bold">${p.name}</span>
+                    </div>
+                    <span class="text-cyber-cyan font-bold">${p.score} pts</span>
+                `;
+                list.appendChild(item);
+            });
+
+            // Update local statistics
+            const currentHigh = parseInt(localStorage.getItem('cyber_highscore') || '0');
+            if (winner.score > currentHigh) {
+                localStorage.setItem('cyber_highscore', winner.score);
+            }
+            const matches = parseInt(localStorage.getItem('cyber_matches') || '0') + 1;
+            localStorage.setItem('cyber_matches', matches);
+            initProfile();
+
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+            }
+        }
+
+        function copyRoomCode() {
+            const code = appState.roomCode;
+            navigator.clipboard.writeText(code);
+            alert('Room Code (' + code + ') telah disalin!');
+        }
+
+        function toggleSFX() {
+            audio.muted = !audio.muted;
+            document.getElementById('sfxIcon').className = audio.muted ? 'fa-solid fa-volume-xmark text-red-500' : 'fa-solid fa-volume-high text-cyber-lime';
+            document.getElementById('sfxLabel').textContent = audio.muted ? 'SFX OFF' : 'SFX ON';
+        }
+
+        function openProfileModal() {
+            document.getElementById('modalNameInput').value = localPlayer.name;
+            document.getElementById('profileModal').classList.remove('hidden');
+        }
+
+        function selectAvatar(emoji) {
+            localPlayer.avatar = emoji;
+        }
+
+        function saveProfileModal() {
+            const newName = document.getElementById('modalNameInput').value.trim() || 'CyberUser';
+            localPlayer.name = newName;
+            localStorage.setItem('cyber_name', localPlayer.name);
+            localStorage.setItem('cyber_avatar', localPlayer.avatar);
+            initProfile();
+            document.getElementById('profileModal').classList.add('hidden');
+        }
+
+        function leaveLobby() {
+            if (appState.peer) appState.peer.destroy();
+            showScreen('screenHome');
+        }
+
+        // Initialize on Load
+        window.onload = () => {
+            initProfile();
+        };
+    </script>
+</body>
+</html>
